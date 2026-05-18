@@ -41,6 +41,12 @@ export const useCanvasState = () => {
         setCurrentLine(null);
     };
 
+    const clearCanvas = () => {
+        setCompletedLines([]);
+        setCurrentLine(null);
+    };
+    
+
     return {
         currentLine,
         completedLines,
@@ -48,5 +54,6 @@ export const useCanvasState = () => {
         handleTouchStart,
         handleTouchMove,
         handleTouchEnd,
+        clearCanvas,
     };
 };

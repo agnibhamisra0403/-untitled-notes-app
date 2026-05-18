@@ -1,4 +1,4 @@
-import { StyleSheet, View, GestureResponderEvent } from 'react-native';
+import { StyleSheet, View, GestureResponderEvent, Button, Pressable, Text } from 'react-native';
 import { Canvas, Circle, Path, Skia } from '@shopify/react-native-skia';
 import { useCanvasState } from '../hooks/useCanvasState';
 import { Point } from '../types/canvas';
@@ -9,7 +9,8 @@ export default function App() {
     completedLines, 
     handleTouchStart, 
     handleTouchMove, 
-    handleTouchEnd 
+    handleTouchEnd,
+    clearCanvas
   } = useCanvasState();
 
   console.log(
@@ -79,6 +80,28 @@ export default function App() {
         onTouchMove={handleTouchMove}
         onTouchEnd={handleTouchEnd}
       />
+      <Pressable
+        style={{
+          backgroundColor: '#f35a5aa4',
+          position: 'absolute', 
+          bottom: 20, 
+          right: 20,
+          borderRadius: 12,
+        }}
+        onPress={clearCanvas}
+      >
+        <Text
+          style={{
+            color: '#ffe4e4ff',
+            fontSize: 20,
+            fontWeight: 'bold',
+            textAlign: 'center',
+            padding: 10,
+          }}
+        >
+          Clear
+        </Text>
+      </Pressable>
     </View>
   );
 } 
