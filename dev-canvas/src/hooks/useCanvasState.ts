@@ -4,14 +4,21 @@ import { Line, Point } from '../types/canvas';
 export const useCanvasState = () => {
     const [currentLine, setCurrentLine] = useState<Line | null>(null);
     const [completedLines, setCompletedLines] = useState<Line[]>([]);
+    const [canvasOffsetX, setCanvasOffsetX] = useState<number>(0);
+    const [canvasOffsetY, setCanvasOffsetY] = useState<number>(0);
+
+    const updatePan = (changeX: number, changeY: number) => {
+        // since we have access to event translation, we can use that to shift the image rather than compute it ourself
+        setCanvasOffsetX((prev) => prev + (changeX || 0));
+        setCanvasOffsetY((prev) => prev + (changeY || 0));
+    }
 
     const handleGestureStart = (event: any) => {
-        console.log("POINTER TYPE: ", event.pointerType)
         if (event.pointerType !== 1) {
             return; // the touch case
         }
-        const x = event.x;
-        const y = event.y;
+        const x = event.x - canvasOffsetX;
+        const y = event.y - canvasOffsetY;
 
         const pressure = event.pressure
         const force = event.force;
@@ -30,8 +37,8 @@ export const useCanvasState = () => {
     const handleGestureMove = (event: any) => {
         if (event.pointerType !== 1) return; // Ignore fingers
 
-        const x = event.x;
-        const y = event.y;
+        const x = event.x - canvasOffsetX;
+        const y = event.y - canvasOffsetY;
         const newPoint: Point = { x, y };
 
         // Use a functional updater (prevLine represents the exact state right now)
@@ -55,50 +62,6 @@ export const useCanvasState = () => {
         });
     };
 
-    // const handleTouchStart = (event: GestureResponderEvent) => {
-    //     // console.log("WHAT THE HARDWARE SEES:", (event.nativeEvent as any).touchType);
-    //     // if ((event.nativeEvent as any).touchType !== 'stylus') {
-    //     //     return;
-    //     // }
-
-    //     const x = event.nativeEvent.locationX;
-    //     const y = event.nativeEvent.locationY;
-
-    //     const point: Point = { x, y };
-
-    //     const newLine: Line = {
-    //         points: [point],
-    //         color: '#00FFFF',
-    //         width: 5,
-    //     };
-    //     setCurrentLine(newLine);
-
-    // };
-
-    // const handleTouchMove = (event: GestureResponderEvent) => {
-    //     // console.log("WHAT THE HARDWARE SEES:", (event.nativeEvent as any).touchType);
-    //     // if ((event.nativeEvent as any).touchType !== 'stylus') {
-    //     //     return;
-    //     // }
-
-    //     if (!currentLine) return;
-
-    //     const x = event.nativeEvent.locationX;
-    //     const y = event.nativeEvent.locationY;
-
-    //     const newPoint: Point = {x, y};
-    //     const updatedLine: Line = {...currentLine, points: [...currentLine.points, newPoint]};
-
-    //     setCurrentLine(updatedLine);
-
-    // };
-
-    // const handleTouchEnd = () => {
-    //     if (!currentLine) return;
-    //     setCompletedLines([...completedLines, currentLine]);
-    //     setCurrentLine(null);
-    // };
-
     const clearCanvas = () => {
         setCompletedLines([]);
         setCurrentLine(null);
@@ -108,6 +71,11 @@ export const useCanvasState = () => {
     return {
         currentLine,
         completedLines,
+        canvasOffsetX,
+        canvasOffsetY,
+        updatePan,
+        setCanvasOffsetX,
+        setCanvasOffsetY,
         setCompletedLines,
         handleGestureStart,
         handleGestureMove,
