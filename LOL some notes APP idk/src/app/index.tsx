@@ -1,5 +1,6 @@
 import { Canvas, Path, Skia, Group } from '@shopify/react-native-skia';
 import { Animated, Pressable, StyleSheet, Text, View } from 'react-native';
+import { useRef } from 'react';
 import { Gesture, GestureDetector, GestureHandlerRootView, GestureUpdateEvent, PanGestureHandlerEventPayload, PanGestureChangeEventPayload } from 'react-native-gesture-handler';
 import { useCanvasState } from '../hooks/useCanvasState';
 import { Point } from '../types/canvas';
@@ -10,6 +11,7 @@ export default function App() {
     completedLines,
     canvasOffsetX,
     canvasOffsetY,
+    zoomMultiplier,
     updatePan,
     setCanvasOffsetX,
     setCanvasOffsetY,
@@ -17,12 +19,14 @@ export default function App() {
     handleGestureStart,
     handleGestureMove,
     handleGestureEnd,
+    handleZoomUpdate,
     clearCanvas,
   } = useCanvasState();
 
-  // handler for pencil/stylus drawing
+  // handler for panning/drawing gestures
   const pencilPanGesture = Gesture.Pan()
     .runOnJS(true)
+    .minDistance(0)
     .onStart((event: GestureUpdateEvent<PanGestureHandlerEventPayload>) => {
       console.log("pointer type", event.pointerType);
       console.log("number of pointers", event.numberOfPointers);
@@ -50,6 +54,36 @@ export default function App() {
     .onEnd((event) => {
       handleGestureEnd();
     });
+  
+  // variables for pinch/zoom
+  const previousFocal = useRef({ x: 0, y: 0 });
+  // handler for canvas pinch/zoom gesture
+  const canvasPinchGesture = Gesture.Pinch()
+    .runOnJS(true)
+    .onStart((event) => {
+      previousFocal.current = { x: event.focalX, y: event.focalY };
+    })
+    .onChange((event) => {
+      const scaleDelta = event.scaleChange;     
+      handleZoomUpdate(scaleDelta);
+
+      // need to update the canvas offset to keep the focal point of the pinch gesture at the same location on the screen even after the pinch/zoom occurs
+      const panX = event.focalX - previousFocal.current.x;
+      const panY = event.focalY - previousFocal.current.y;
+      
+      // calculate the focal point drift to reverse the effect of zoom - allows the content to grow outwards from the focal point rather than the top-left corner
+      const zoomDriftX = (event.focalX - canvasOffsetX) * (1 - scaleDelta);
+      const zoomDriftY = (event.focalY - canvasOffsetY) * (1 - scaleDelta);
+      
+      // add both of the above together to get the total change in canvas offset
+      const totalChangeX = panX + zoomDriftX;
+      const totalChangeY = panY + zoomDriftY;
+
+      updatePan(totalChangeX, totalChangeY);
+      previousFocal.current = { x: event.focalX, y: event.focalY };
+    });
+  
+  const simultanousGestures = Gesture.Simultaneous(pencilPanGesture, canvasPinchGesture);
 
   console.log(
     `Active Points: ${currentLine?.points.length || 0} | Total Lines Saved: ${completedLines.length}\n`
@@ -61,7 +95,7 @@ export default function App() {
     <GestureHandlerRootView style={{ flex: 1 }}>
       <View style={styles.container}>
         <Canvas style={styles.canvas}>
-            <Group transform={[{ translateX: canvasOffsetX }, { translateY: canvasOffsetY }]}>
+            <Group transform={[{ translateX: canvasOffsetX }, { translateY: canvasOffsetY }, {scale: zoomMultiplier}]}>
 
             {/* for all the completed lines in the array */}
             {completedLines.map((line, index) => {
@@ -118,7 +152,7 @@ export default function App() {
           </Group>
         </Canvas>
 
-        <GestureDetector gesture={pencilPanGesture}>
+        <GestureDetector gesture={simultanousGestures}>
           {/* This animated view sits completely invisibly over the entire screen layout */}
           <Animated.View style={StyleSheet.absoluteFill}/>
         </GestureDetector>
