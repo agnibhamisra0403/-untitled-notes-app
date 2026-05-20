@@ -5,6 +5,7 @@ import { Gesture, GestureDetector, GestureHandlerRootView, GestureUpdateEvent, P
 import { useCanvasState } from '../hooks/useCanvasState';
 import { Point } from '../types/canvas';
 
+
 let eraserMode = false;
 
 export default function App() {
@@ -18,6 +19,8 @@ export default function App() {
     setCanvasOffsetX,
     setCanvasOffsetY,
     setCompletedLines,
+    isEraserActive,
+    toggleEraserActive,
     handleGestureStart,
     handleGestureMove,
     handleGestureEnd,
@@ -39,10 +42,10 @@ export default function App() {
         // finger pan case, we need to update canvas offset here - in this case there is no end position, so we do the update here instead of onEnd
       }
       else if (event.pointerType === 1) {
-        if (eraserMode) {
+        if (isEraserActive) {
           handleEraserStart(event);
         }
-        if (!eraserMode) {
+        if (!isEraserActive) {
           handleGestureStart(event);
         };
       }
@@ -56,10 +59,10 @@ export default function App() {
         updatePan(event.changeX, event.changeY);
       }
       else if (event.pointerType === 1) {
-        if (eraserMode) {
+        if (isEraserActive) {
           handleEraserMove(event);
         };
-        if (!eraserMode) {
+        if (!isEraserActive) {
           handleGestureMove(event);
         };
         
@@ -198,33 +201,17 @@ export default function App() {
         {/* Eraser button */}
         <Pressable
           style={{
-            backgroundColor: '#f35a5aa4',
+            backgroundColor: isEraserActive ? '#FF3B30' : '#f35a5aa4',
+            borderWidth: isEraserActive ? 2 : 0,
+            borderColor: '#FFFFFF',
             position: 'absolute',
             top: 50,
             left: 20,
             borderRadius: 12,
           }}
-          onPress={() => {
-            // the eraser mode
-            eraserMode = !eraserMode;
-            if (eraserMode) {
-              console.log("Eraser mode enabled");
-            } else {
-              console.log("Eraser mode disabled");
-            }
-          }}
+          onPress={toggleEraserActive}
         >
-          <Text
-            style={{
-              color: '#ffe4e4ff',
-              fontSize: 20,
-              fontWeight: 'bold',
-              textAlign: 'center',
-              padding: 10,
-            }}
-          >
-            Eraser
-          </Text>
+          <Text style={styles.buttonText}>Eraser</Text>
         </Pressable>
       </View>
     </GestureHandlerRootView>
@@ -238,5 +225,12 @@ const styles = StyleSheet.create({
   },
   canvas: {
     flex: 1
+  },
+  buttonText: {
+    color: '#ffe4e4ff',
+    fontSize: 20,
+    fontWeight: 'bold',
+    textAlign: 'center',
+    padding: 10,
   }
 });

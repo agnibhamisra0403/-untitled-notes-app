@@ -13,8 +13,15 @@ export const useCanvasState = () => {
     // zooming
     const [zoomMultiplier, setZoomMultiplier] = useState<number>(1);
 
+    const [isEraserActive, setIsEraserActive] = useState<boolean>(false);
+
 
 // helper functions
+
+    // this is a simple function that toggles the eraser mode on and off
+    const toggleEraserActive = () => {
+        setIsEraserActive((prev) => !prev);
+    }
 
     // this is the main function that is responsible for the panning of the canvas
     const updatePan = (changeX: number, changeY: number) => {
@@ -101,18 +108,22 @@ export const useCanvasState = () => {
         const eraserY = (event.y - canvasOffsetY) / zoomMultiplier;
         const radius = 20;
 
-        setCompletedLines((prev) => prev.filter((line) => {
-            if (!line.bounds) return true;
-
-            // 2. Quick check: If the eraser is outside the extended bounding box, keep the line
-            if (eraserX < line.bounds.minX - radius || eraserX > line.bounds.maxX + radius ||
-                eraserY < line.bounds.minY - radius || eraserY > line.bounds.maxY + radius) {
-                return true;
+        setCompletedLines((prev) => {
+            const filtered = prev.filter((line) => {
+                if (!line.bounds) return true;
+                if (eraserX < line.bounds.minX - radius || eraserX > line.bounds.maxX + radius ||
+                    eraserY < line.bounds.minY - radius || eraserY > line.bounds.maxY + radius) {
+                    return true;
+                }
+                const isHit = line.points.some(p => Math.sqrt(Math.pow(p.x - eraserX, 2) + Math.pow(p.y - eraserY, 2)) < radius);
+                return !isHit;
+            });
+            if (filtered.length === prev.length) {
+                return prev;
             }
-            const isHit = line.points.some(p => Math.sqrt(Math.pow(p.x - eraserX, 2) + Math.pow(p.y - eraserY, 2)) < radius);
+            return filtered;
+        });
 
-            return !isHit;
-        }))
     }
 
     const handleEraserMove = (event: any) => {
@@ -120,18 +131,21 @@ export const useCanvasState = () => {
         const eraserY = (event.y - canvasOffsetY) / zoomMultiplier;
         const radius = 20;
 
-        setCompletedLines((prev) => prev.filter((line) => {
-            if (!line.bounds) return true;
-
-            // 2. Quick check: If the eraser is outside the extended bounding box, keep the line
-            if (eraserX < line.bounds.minX - radius || eraserX > line.bounds.maxX + radius ||
-                eraserY < line.bounds.minY - radius || eraserY > line.bounds.maxY + radius) {
-                return true;
+        setCompletedLines((prev) => {
+            const filtered = prev.filter((line) => {
+                if (!line.bounds) return true;
+                if (eraserX < line.bounds.minX - radius || eraserX > line.bounds.maxX + radius ||
+                    eraserY < line.bounds.minY - radius || eraserY > line.bounds.maxY + radius) {
+                    return true;
+                }
+                const isHit = line.points.some(p => Math.sqrt(Math.pow(p.x - eraserX, 2) + Math.pow(p.y - eraserY, 2)) < radius);
+                return !isHit;
+            });
+            if (filtered.length === prev.length) {
+                return prev;
             }
-            const isHit = line.points.some(p => Math.sqrt(Math.pow(p.x - eraserX, 2) + Math.pow(p.y - eraserY, 2)) < radius);
-
-            return !isHit;
-        }))
+            return filtered;
+        });
 
     }
 
@@ -146,6 +160,8 @@ export const useCanvasState = () => {
         canvasOffsetX,
         canvasOffsetY,
         zoomMultiplier,
+        isEraserActive,
+        toggleEraserActive,
         updatePan,
         setCanvasOffsetX,
         setCanvasOffsetY,
