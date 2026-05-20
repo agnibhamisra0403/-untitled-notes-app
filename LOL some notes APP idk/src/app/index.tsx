@@ -1,34 +1,40 @@
-import { Canvas, Path, Skia, Group } from '@shopify/react-native-skia';
+import { Canvas, Path, Skia, Group, Circle } from '@shopify/react-native-skia';
 import { Animated, Pressable, StyleSheet, Text, View } from 'react-native';
-import { useRef } from 'react';
+import { useRef, useState } from 'react';
 import { Gesture, GestureDetector, GestureHandlerRootView, GestureUpdateEvent, PanGestureHandlerEventPayload, PanGestureChangeEventPayload } from 'react-native-gesture-handler';
 import { useCanvasState } from '../hooks/useCanvasState';
 import { Point } from '../types/canvas';
-
+import { Ionicons } from '@expo/vector-icons';
+import { EraserIcon } from '../components/eraserIcon';
+import {SidebarIcon} from '../components/SidebarIcon';
 
 let eraserMode = false;
 
 export default function App() {
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
+
   const {
-    currentLine,
-    completedLines,
-    canvasOffsetX,
-    canvasOffsetY,
-    zoomMultiplier,
-    updatePan,
-    setCanvasOffsetX,
-    setCanvasOffsetY,
-    setCompletedLines,
-    isEraserActive,
-    toggleEraserActive,
-    handleGestureStart,
-    handleGestureMove,
-    handleGestureEnd,
-    handleZoomUpdate,
-    clearCanvas,
-    handleEraserStart,
-    handleEraserMove,
-    handleEraserEnd
+      currentLine,
+      completedLines,
+      canvasOffsetX,
+      canvasOffsetY,
+      zoomMultiplier,
+      isEraserActive,
+      eraserPosition,
+      setEraserPosition,
+      toggleEraserActive,
+      updatePan,
+      setCanvasOffsetX,
+      setCanvasOffsetY,
+      setCompletedLines,
+      handleGestureStart,
+      handleGestureMove,
+      handleGestureEnd,
+      handleZoomUpdate,
+      clearCanvas,
+      handleEraserStart,
+      handleEraserMove,
+      handleEraserEnd
   } = useCanvasState();
 
   // handler for panning/drawing gestures
@@ -38,7 +44,7 @@ export default function App() {
     .onStart((event: GestureUpdateEvent<PanGestureHandlerEventPayload>) => {
       console.log("pointer type", event.pointerType);
       console.log("number of pointers", event.numberOfPointers);
-      if (event.pointerType === 0){
+      if (event.pointerType === 0) {
         // finger pan case, we need to update canvas offset here - in this case there is no end position, so we do the update here instead of onEnd
       }
       else if (event.pointerType === 1) {
@@ -53,7 +59,7 @@ export default function App() {
     .onChange((event: GestureUpdateEvent<PanGestureHandlerEventPayload>) => {
       console.log("pointer type", event.pointerType);
       console.log("number of pointers", event.numberOfPointers);
-      if (event.pointerType === 0){
+      if (event.pointerType === 0) {
         // finger pan case
         console.log("Pan Deltas:", event.changeX, event.changeY);
         updatePan(event.changeX, event.changeY);
@@ -65,13 +71,18 @@ export default function App() {
         if (!isEraserActive) {
           handleGestureMove(event);
         };
-        
+
       }
     })
     .onEnd((event) => {
-      handleGestureEnd();
+      if (isEraserActive) {
+        handleEraserEnd()
+      }
+      else {
+        handleGestureEnd();
+      }
     });
-  
+
   // variables for pinch/zoom
   const previousFocal = useRef({ x: 0, y: 0 });
   // handler for canvas pinch/zoom gesture
@@ -81,17 +92,17 @@ export default function App() {
       previousFocal.current = { x: event.focalX, y: event.focalY };
     })
     .onChange((event) => {
-      const scaleDelta = event.scaleChange;     
+      const scaleDelta = event.scaleChange;
       handleZoomUpdate(scaleDelta);
 
       // need to update the canvas offset to keep the focal point of the pinch gesture at the same location on the screen even after the pinch/zoom occurs
       const panX = event.focalX - previousFocal.current.x;
       const panY = event.focalY - previousFocal.current.y;
-      
+
       // calculate the focal point drift to reverse the effect of zoom - allows the content to grow outwards from the focal point rather than the top-left corner
       const zoomDriftX = (event.focalX - canvasOffsetX) * (1 - scaleDelta);
       const zoomDriftY = (event.focalY - canvasOffsetY) * (1 - scaleDelta);
-      
+
       // add both of the above together to get the total change in canvas offset
       const totalChangeX = panX + zoomDriftX;
       const totalChangeY = panY + zoomDriftY;
@@ -99,7 +110,7 @@ export default function App() {
       updatePan(totalChangeX, totalChangeY);
       previousFocal.current = { x: event.focalX, y: event.focalY };
     });
-  
+
   const simultanousGestures = Gesture.Simultaneous(pencilPanGesture, canvasPinchGesture);
 
   console.log(
@@ -108,11 +119,10 @@ export default function App() {
 
 
   return (
-    // ✨ UPGRADE: Root wrapper context that activates advanced hardware listeners across the glass
     <GestureHandlerRootView style={{ flex: 1 }}>
       <View style={styles.container}>
         <Canvas style={styles.canvas}>
-            <Group transform={[{ translateX: canvasOffsetX }, { translateY: canvasOffsetY }, {scale: zoomMultiplier}]}>
+          <Group transform={[{ translateX: canvasOffsetX }, { translateY: canvasOffsetY }, { scale: zoomMultiplier }]}>
 
             {/* for all the completed lines in the array */}
             {completedLines.map((line, index) => {
@@ -166,53 +176,123 @@ export default function App() {
                 />
               )
             })()}
+
+            {isEraserActive && eraserPosition && (
+              <Circle
+                cx={eraserPosition.x}
+                cy={eraserPosition.y}
+                r={20}
+                color="#A0A0A0"
+                style="stroke"
+                strokeWidth={2}
+              />
+            )}
+
           </Group>
         </Canvas>
 
         <GestureDetector gesture={simultanousGestures}>
-          {/* This animated view sits completely invisibly over the entire screen layout */}
           <Animated.View style={StyleSheet.absoluteFill}/>
         </GestureDetector>
 
-        {/* Clear button */}
-        <Pressable
-          style={{
-            backgroundColor: '#f35a5aa4',
-            position: 'absolute',
-            bottom: 20,
-            right: 20,
-            borderRadius: 12,
-          }}
-          onPress={clearCanvas}
-        >
-          <Text
-            style={{
-              color: '#ffe4e4ff',
-              fontSize: 20,
-              fontWeight: 'bold',
-              textAlign: 'center',
-              padding: 10,
-            }}
+        <View style={styles.toolbarContainer}>
+
+          {/* Pen Tool */}
+          <Pressable
+            style={[styles.toolButton, !isEraserActive && styles.activeTool]}
+            onPress={() => isEraserActive && toggleEraserActive()}
           >
-            Clear
-          </Text>
+            <Ionicons 
+              name="pencil" 
+              size={24} 
+              color={!isEraserActive ? '#FFFFFF' : '#A0A0A0'} 
+            />
+          </Pressable>
+
+          {/* Eraser Tool */}
+          <Pressable
+            style={[styles.toolButton, isEraserActive && styles.activeTool]}
+            onPress={() => !isEraserActive && toggleEraserActive()}
+          >
+            <EraserIcon 
+              color={isEraserActive ? '#FFFFFF' : '#A0A0A0'} 
+              size={24}
+            />
+          </Pressable>
+
+          {/* Divider */}
+          <View style={styles.divider} />
+
+          {/* Clear Canvas Action */}
+          <Pressable
+            style={styles.actionButton}
+            onPress={clearCanvas}
+          >
+            <Ionicons name="trash-outline" size={24} color="#FF453A" />
+          </Pressable>
+
+        </View>
+        
+        {isMenuOpen && (
+          <View style={styles.sidebarDrawer}>
+
+            <View style={styles.sidebarContent}>
+              {/* Share Button */}
+              <Pressable 
+                style={styles.sidebarItem} 
+                onPress={() => console.log("Share clicked")}
+              >
+                <Ionicons name="share-outline" size={24} color="#FFFFFF" />
+                <Text style={styles.sidebarText}>Share</Text>
+              </Pressable>
+
+              <View style={styles.menuDivider} />
+
+              {/* Export Button */}
+              <Pressable 
+                style={styles.sidebarItem} 
+                onPress={() => console.log("Export clicked")}
+              >
+                <Ionicons name="download-outline" size={24} color="#FFFFFF" />
+                <Text style={styles.sidebarText}>Export</Text>
+              </Pressable>
+            </View>
+          </View>
+        )}
+
+        <Pressable
+          style={styles.menuButton}
+          onPress={() => setIsMenuOpen(!isMenuOpen)}
+        >
+          <SidebarIcon color={isMenuOpen ? '#0A84FF' : '#FFFFFF'} size={26} />
         </Pressable>
 
-        {/* Eraser button */}
-        <Pressable
-          style={{
-            backgroundColor: isEraserActive ? '#FF3B30' : '#f35a5aa4',
-            borderWidth: isEraserActive ? 2 : 0,
-            borderColor: '#FFFFFF',
-            position: 'absolute',
-            top: 50,
-            left: 20,
-            borderRadius: 12,
-          }}
-          onPress={toggleEraserActive}
-        >
-          <Text style={styles.buttonText}>Eraser</Text>
-        </Pressable>
+        {/* THE FLOATING CENTRAL TOOLBAR */}
+        <View style={styles.toolbarContainer}>
+          {/* Pen Tool */}
+          <Pressable
+            style={[styles.toolButton, !isEraserActive && styles.activeTool]}
+            onPress={() => isEraserActive && toggleEraserActive()}
+          >
+            <Ionicons name="pencil" size={24} color={!isEraserActive ? '#FFFFFF' : '#A0A0A0'} />
+          </Pressable>
+
+          {/* Eraser Tool */}
+          <Pressable
+            style={[styles.toolButton, isEraserActive && styles.activeTool]}
+            onPress={() => !isEraserActive && toggleEraserActive()}
+          >
+            <EraserIcon color={isEraserActive ? '#FFFFFF' : '#A0A0A0'} size={24} />
+          </Pressable>
+
+          {/* Divider */}
+          <View style={styles.divider} />
+
+          {/* Clear Canvas Action */}
+          <Pressable style={styles.actionButton} onPress={clearCanvas}>
+            <Ionicons name="trash-outline" size={24} color="#FF453A" />
+          </Pressable>
+        </View>
       </View>
     </GestureHandlerRootView>
   );
@@ -221,16 +301,104 @@ export default function App() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#1E1E1E'
+    backgroundColor: '#1C1C1E', // Apple's native dark mode background
   },
   canvas: {
-    flex: 1
+    flex: 1,
   },
-  buttonText: {
-    color: '#ffe4e4ff',
-    fontSize: 20,
-    fontWeight: 'bold',
-    textAlign: 'center',
+
+  toolbarContainer: {
+    position: 'absolute',
+    top: 60, 
+    alignSelf: 'center', 
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#2C2C2E', 
+    borderRadius: 16,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+
+    // Drop Shadow for 3D elevation
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 10,
+    elevation: 8, // For Android shadow support
+  },
+  toolButton: {
     padding: 10,
+    marginHorizontal: 4,
+    borderRadius: 10,
+    backgroundColor: 'transparent',
+  },
+  activeTool: {
+    backgroundColor: '#0A84FF', 
+  },
+  divider: {
+    width: 1,
+    height: 24,
+    backgroundColor: '#48484A',
+    marginHorizontal: 8,
+  },
+  actionButton: {
+    padding: 10,
+    marginHorizontal: 4,
+    borderRadius: 10,
+    backgroundColor: '#3A1C1E', 
+  },
+  menuButton: {
+    position: 'absolute',
+    top: 60, // Exactly the same Y-level as the central toolbar
+    left: 20,
+    padding: 10,
+    backgroundColor: '#2C2C2E',
+    borderRadius: 12,
+    zIndex: 100, 
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 10,
+    elevation: 8,
+  },
+  sidebarDrawer: {
+    position: 'absolute',
+    top: 0,
+    bottom: 0, 
+    left: 0,
+    width: 260, 
+    backgroundColor: '#1C1C1E', 
+    borderRightWidth: 1,
+    borderRightColor: '#2C2C2E',
+    zIndex: 90,
+    
+    // Creates a shadow casting to the right over your canvas
+    shadowColor: '#000',
+    shadowOffset: { width: 4, height: 0 },
+    shadowOpacity: 0.5,
+    shadowRadius: 15,
+    elevation: 10,
+  },
+  sidebarContent: {
+    marginTop: 130, 
+    paddingHorizontal: 12,
+  },
+  sidebarItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 16,
+    paddingHorizontal: 16,
+    borderRadius: 10,
+  },
+  sidebarText: {
+    color: '#FFFFFF',
+    fontSize: 17,
+    fontWeight: '500',
+    marginLeft: 16,
+  },
+  menuDivider: {
+    height: 1,
+    backgroundColor: '#2C2C2E',
+    marginHorizontal: 16,
+    marginVertical: 8,
   }
 });

@@ -13,8 +13,9 @@ export const useCanvasState = () => {
     // zooming
     const [zoomMultiplier, setZoomMultiplier] = useState<number>(1);
 
+    //eraser
     const [isEraserActive, setIsEraserActive] = useState<boolean>(false);
-
+    const [eraserPosition, setEraserPosition] = useState<Point | null>(null);
 
 // helper functions
 
@@ -108,6 +109,8 @@ export const useCanvasState = () => {
         const eraserY = (event.y - canvasOffsetY) / zoomMultiplier;
         const radius = 20;
 
+        setEraserPosition({ x: eraserX, y: eraserY });
+
         setCompletedLines((prev) => {
             const filtered = prev.filter((line) => {
                 if (!line.bounds) return true;
@@ -131,6 +134,8 @@ export const useCanvasState = () => {
         const eraserY = (event.y - canvasOffsetY) / zoomMultiplier;
         const radius = 20;
 
+        setEraserPosition({ x: eraserX, y: eraserY });
+
         setCompletedLines((prev) => {
             const filtered = prev.filter((line) => {
                 if (!line.bounds) return true;
@@ -150,6 +155,7 @@ export const useCanvasState = () => {
     }
 
     const handleEraserEnd = () => {
+        setEraserPosition(null);
         
     }
 
@@ -161,6 +167,8 @@ export const useCanvasState = () => {
         canvasOffsetY,
         zoomMultiplier,
         isEraserActive,
+        eraserPosition,
+        setEraserPosition,
         toggleEraserActive,
         updatePan,
         setCanvasOffsetX,
