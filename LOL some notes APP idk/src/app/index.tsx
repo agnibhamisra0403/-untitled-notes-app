@@ -5,6 +5,8 @@ import { Gesture, GestureDetector, GestureHandlerRootView, GestureUpdateEvent, P
 import { useCanvasState } from '../hooks/useCanvasState';
 import { Point } from '../types/canvas';
 
+let eraserMode = false;
+
 export default function App() {
   const {
     currentLine,
@@ -21,6 +23,9 @@ export default function App() {
     handleGestureEnd,
     handleZoomUpdate,
     clearCanvas,
+    handleEraserStart,
+    handleEraserMove,
+    handleEraserEnd
   } = useCanvasState();
 
   // handler for panning/drawing gestures
@@ -34,8 +39,12 @@ export default function App() {
         // finger pan case, we need to update canvas offset here - in this case there is no end position, so we do the update here instead of onEnd
       }
       else if (event.pointerType === 1) {
-        // pencil/stylus stroke case
-        handleGestureStart(event);
+        if (eraserMode) {
+          handleEraserStart(event);
+        }
+        if (!eraserMode) {
+          handleGestureStart(event);
+        };
       }
     })
     .onChange((event: GestureUpdateEvent<PanGestureHandlerEventPayload>) => {
@@ -47,8 +56,13 @@ export default function App() {
         updatePan(event.changeX, event.changeY);
       }
       else if (event.pointerType === 1) {
-        // pencil/stylus stroke case
-        handleGestureMove(event);
+        if (eraserMode) {
+          handleEraserMove(event);
+        };
+        if (!eraserMode) {
+          handleGestureMove(event);
+        };
+        
       }
     })
     .onEnd((event) => {
@@ -178,6 +192,38 @@ export default function App() {
             }}
           >
             Clear
+          </Text>
+        </Pressable>
+
+        {/* Eraser button */}
+        <Pressable
+          style={{
+            backgroundColor: '#f35a5aa4',
+            position: 'absolute',
+            top: 50,
+            left: 20,
+            borderRadius: 12,
+          }}
+          onPress={() => {
+            // the eraser mode
+            eraserMode = !eraserMode;
+            if (eraserMode) {
+              console.log("Eraser mode enabled");
+            } else {
+              console.log("Eraser mode disabled");
+            }
+          }}
+        >
+          <Text
+            style={{
+              color: '#ffe4e4ff',
+              fontSize: 20,
+              fontWeight: 'bold',
+              textAlign: 'center',
+              padding: 10,
+            }}
+          >
+            Eraser
           </Text>
         </Pressable>
       </View>

@@ -47,6 +47,7 @@ export const useCanvasState = () => {
 
     // this is the main function that handles the movement during a gesture - either a pan or a stroke
     const handleGestureMove = (event: any) => {
+        
         if (event.pointerType !== 1) return; // Ignore fingers
 
         const x = (event.x - canvasOffsetX) / zoomMultiplier;
@@ -67,11 +68,21 @@ export const useCanvasState = () => {
     // this is the main function that handles the end of a gesture - either a pan or a stroke
     const handleGestureEnd = () => {
         setCurrentLine((prevLine) => {
-            if (prevLine) {
-                // Use a functional update on completedLines to prevent array race conditions
-                setCompletedLines((prevCompleted) => [...prevCompleted, prevLine]);
+            if (prevLine && prevLine.points.length > 0) {
+                const xs = prevLine.points.map(p => p.x);
+                const ys = prevLine.points.map(p => p.y);
+                const bounds = {
+                    minX: Math.min(...xs),
+                    maxX: Math.max(...xs),
+                    minY: Math.min(...ys),
+                    maxY: Math.max(...ys),
+                };
+
+                const lineWithBounds: Line = { ...prevLine, bounds };
+                setCompletedLines((prev) => [...prev, lineWithBounds]);
+                
             }
-            return null; // Instantly clears the active workbench
+            return null;
         });
     };
 
@@ -84,6 +95,49 @@ export const useCanvasState = () => {
         setCompletedLines([]);
         setCurrentLine(null);
     };
+
+    const handleEraserStart = (event: any) => {
+        const eraserX = (event.x - canvasOffsetX) / zoomMultiplier;
+        const eraserY = (event.y - canvasOffsetY) / zoomMultiplier;
+        const radius = 20;
+
+        setCompletedLines((prev) => prev.filter((line) => {
+            if (!line.bounds) return true;
+
+            // 2. Quick check: If the eraser is outside the extended bounding box, keep the line
+            if (eraserX < line.bounds.minX - radius || eraserX > line.bounds.maxX + radius ||
+                eraserY < line.bounds.minY - radius || eraserY > line.bounds.maxY + radius) {
+                return true;
+            }
+            const isHit = line.points.some(p => Math.sqrt(Math.pow(p.x - eraserX, 2) + Math.pow(p.y - eraserY, 2)) < radius);
+
+            return !isHit;
+        }))
+    }
+
+    const handleEraserMove = (event: any) => {
+        const eraserX = (event.x - canvasOffsetX) / zoomMultiplier;
+        const eraserY = (event.y - canvasOffsetY) / zoomMultiplier;
+        const radius = 20;
+
+        setCompletedLines((prev) => prev.filter((line) => {
+            if (!line.bounds) return true;
+
+            // 2. Quick check: If the eraser is outside the extended bounding box, keep the line
+            if (eraserX < line.bounds.minX - radius || eraserX > line.bounds.maxX + radius ||
+                eraserY < line.bounds.minY - radius || eraserY > line.bounds.maxY + radius) {
+                return true;
+            }
+            const isHit = line.points.some(p => Math.sqrt(Math.pow(p.x - eraserX, 2) + Math.pow(p.y - eraserY, 2)) < radius);
+
+            return !isHit;
+        }))
+
+    }
+
+    const handleEraserEnd = () => {
+        
+    }
 
 
     return {
@@ -101,5 +155,8 @@ export const useCanvasState = () => {
         handleGestureEnd,
         handleZoomUpdate,
         clearCanvas,
+        handleEraserStart,
+        handleEraserMove,
+        handleEraserEnd
     };
 };
