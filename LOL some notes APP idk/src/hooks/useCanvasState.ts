@@ -1,5 +1,9 @@
 import { useState } from 'react';
 import { Line, Point } from '../types/canvas';
+import * as ImagePicker from 'expo-image-picker';
+import { ImageAsset } from '../types/canvas';
+import { Skia } from '@shopify/react-native-skia';
+import { Dimensions } from 'react-native';
 
 export const useCanvasState = () => {
     // stroking
@@ -16,6 +20,10 @@ export const useCanvasState = () => {
     //eraser
     const [isEraserActive, setIsEraserActive] = useState<boolean>(false);
     const [eraserPosition, setEraserPosition] = useState<Point | null>(null);
+
+    //image
+    const [images, setImages] = useState<ImageAsset[]>([]);
+    const [selectedImageId, setSelectedImageId] = useState<string | null>(null);
 
 // helper functions
 
@@ -159,6 +167,69 @@ export const useCanvasState = () => {
         
     }
 
+    const handleAddImage = async () => {
+        let result = await ImagePicker.launchImageLibraryAsync({
+            mediaTypes: ImagePicker.MediaTypeOptions.Images,
+            allowsEditing: true,
+            quality: 1, 
+        });
+
+        if (!result.canceled) {
+            const imageAsset = result.assets[0];
+            
+            // TODO: Convert this URI for Skia and save it to state
+            try {
+                const rawData = await Skia.Data.fromURI(imageAsset.uri);
+                const skiaImage = Skia.Image.MakeImageFromEncoded(rawData);
+                
+                if (skiaImage) {
+                    const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
+                    const screenCenterX = screenWidth/2
+                    const screenCenterY = screenHeight/2
+                    
+                    const realCenterX = (screenCenterX - canvasOffsetX) / zoomMultiplier;
+                    const realCenterY = (screenCenterY - canvasOffsetY) / zoomMultiplier;
+                    
+                    const newAsset: ImageAsset = {
+                        id: Date.now().toString(),
+                        x: realCenterX - (imageAsset.width / 8),
+                        y: realCenterY - (imageAsset.height / 8),
+                        width: imageAsset.width / 4,
+                        height: imageAsset.height / 4,
+                        rotation: 0,
+                        scale: 1,
+                        image: skiaImage,
+                    }
+
+                    setImages((prev) => [...prev, newAsset]);
+                    console.log("image successfully compiled and added to state");
+                }
+            } catch (error) {
+                console.error("failed to decode image: ", error);
+            }
+        }
+    }
+
+    const handleImageTap = (event: any) => {
+        if (event.pointerType !== 0) {
+            return;
+        }
+        const tapX = (event.x - canvasOffsetX) / zoomMultiplier;
+        const tapY = (event.y - canvasOffsetY) / zoomMultiplier;
+
+        for (let i = images.length - 1; i >= 0; i--) {
+            const img = images[i];
+            if (tapX >= img.x && 
+                tapX <= img.x + (img.width * img.scale) &&
+                tapY >= img.y && 
+                tapY <= img.y + (img.height * img.scale)) {
+                    setSelectedImageId(img.id);
+                    return;
+                }
+        }
+        setSelectedImageId(null);
+    };
+
 
     return {
         currentLine,
@@ -168,6 +239,8 @@ export const useCanvasState = () => {
         zoomMultiplier,
         isEraserActive,
         eraserPosition,
+        images,
+        selectedImageId,
         setEraserPosition,
         toggleEraserActive,
         updatePan,
@@ -181,6 +254,10 @@ export const useCanvasState = () => {
         clearCanvas,
         handleEraserStart,
         handleEraserMove,
-        handleEraserEnd
+        handleEraserEnd,
+        handleAddImage,
+        setImages,
+        setSelectedImageId,
+        handleImageTap,
     };
 };

@@ -1,4 +1,4 @@
-import { Canvas, Path, Skia, Group, Circle } from '@shopify/react-native-skia';
+import { Canvas, Path, Skia, Group, Circle, Image, Rect } from '@shopify/react-native-skia';
 import { Animated, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useRef, useState } from 'react';
 import { Gesture, GestureDetector, GestureHandlerRootView, GestureUpdateEvent, PanGestureHandlerEventPayload, PanGestureChangeEventPayload } from 'react-native-gesture-handler';
@@ -21,6 +21,8 @@ export default function App() {
       zoomMultiplier,
       isEraserActive,
       eraserPosition,
+      images,
+      selectedImageId,
       setEraserPosition,
       toggleEraserActive,
       updatePan,
@@ -34,7 +36,11 @@ export default function App() {
       clearCanvas,
       handleEraserStart,
       handleEraserMove,
-      handleEraserEnd
+      handleEraserEnd,
+      handleAddImage,
+      setImages,
+      setSelectedImageId,
+      handleImageTap,
   } = useCanvasState();
 
   // handler for panning/drawing gestures
@@ -48,6 +54,7 @@ export default function App() {
         // finger pan case, we need to update canvas offset here - in this case there is no end position, so we do the update here instead of onEnd
       }
       else if (event.pointerType === 1) {
+        setSelectedImageId(null);
         if (isEraserActive) {
           handleEraserStart(event);
         }
@@ -111,18 +118,71 @@ export default function App() {
       previousFocal.current = { x: event.focalX, y: event.focalY };
     });
 
-  const simultanousGestures = Gesture.Simultaneous(pencilPanGesture, canvasPinchGesture);
+    const imageTapGesture = Gesture.Tap()
+      .runOnJS(true)
+      .onEnd(event => {
+        handleImageTap(event);
+      })
+
+  const simultanousGestures = Gesture.Simultaneous(pencilPanGesture, canvasPinchGesture, imageTapGesture);
 
   console.log(
     `Active Points: ${currentLine?.points.length || 0} | Total Lines Saved: ${completedLines.length}\n`
   );
 
+     
 
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <View style={styles.container}>
         <Canvas style={styles.canvas}>
           <Group transform={[{ translateX: canvasOffsetX }, { translateY: canvasOffsetY }, { scale: zoomMultiplier }]}>
+
+            {images && images.map((img) => (
+              <Group key={img.id}>
+
+                {/* The Actual Image */}
+                <Image
+                  image={img.image}
+                  x={img.x}
+                  y={img.y}
+                  width={img.width * img.scale}
+                  height={img.height * img.scale}
+                />
+
+                {/* The Selection Box (Only shows if this image is selected) */}
+                {selectedImageId === img.id && (
+                  <Group>
+                    <Rect
+                      x={img.x}
+                      y={img.y}
+                      width={img.width * img.scale}
+                      height={img.height * img.scale}
+                      color="#0A84FF"
+                      style="stroke"
+                      strokeWidth={2}
+                    />
+
+                    {/* resizing corners */}
+                    {/* Top Left */}
+                    <Rect x={img.x - 6} y={img.y - 6} width={12} height={12} color="#FFFFFF" style="fill" />
+                    <Rect x={img.x - 6} y={img.y - 6} width={12} height={12} color="#0A84FF" style="stroke" strokeWidth={2} />
+
+                    {/* Top Right */}
+                    <Rect x={(img.x + (img.width * img.scale)) - 6} y={img.y - 6} width={12} height={12} color="#FFFFFF" style="fill" />
+                    <Rect x={(img.x + (img.width * img.scale)) - 6} y={img.y - 6} width={12} height={12} color="#0A84FF" style="stroke" strokeWidth={2} />
+
+                    {/* Bottom Right */}
+                    <Rect x={(img.x + (img.width * img.scale)) - 6} y={(img.y + (img.height * img.scale)) - 6} width={12} height={12} color="#FFFFFF" style="fill" />
+                    <Rect x={(img.x + (img.width * img.scale)) - 6} y={(img.y + (img.height * img.scale)) - 6} width={12} height={12} color="#0A84FF" style="stroke" strokeWidth={2} />
+
+                    {/* Bottom Left */}
+                    <Rect x={img.x - 6} y={(img.y + (img.height * img.scale)) - 6} width={12} height={12} color="#FFFFFF" style="fill" />
+                    <Rect x={img.x - 6} y={(img.y + (img.height * img.scale)) - 6} width={12} height={12} color="#0A84FF" style="stroke" strokeWidth={2} />
+                  </Group>
+                )}
+              </Group>
+            ))}
 
             {/* for all the completed lines in the array */}
             {completedLines.map((line, index) => {
@@ -195,43 +255,6 @@ export default function App() {
           <Animated.View style={StyleSheet.absoluteFill}/>
         </GestureDetector>
 
-        <View style={styles.toolbarContainer}>
-
-          {/* Pen Tool */}
-          <Pressable
-            style={[styles.toolButton, !isEraserActive && styles.activeTool]}
-            onPress={() => isEraserActive && toggleEraserActive()}
-          >
-            <Ionicons 
-              name="pencil" 
-              size={24} 
-              color={!isEraserActive ? '#FFFFFF' : '#A0A0A0'} 
-            />
-          </Pressable>
-
-          {/* Eraser Tool */}
-          <Pressable
-            style={[styles.toolButton, isEraserActive && styles.activeTool]}
-            onPress={() => !isEraserActive && toggleEraserActive()}
-          >
-            <EraserIcon 
-              color={isEraserActive ? '#FFFFFF' : '#A0A0A0'} 
-              size={24}
-            />
-          </Pressable>
-
-          {/* Divider */}
-          <View style={styles.divider} />
-
-          {/* Clear Canvas Action */}
-          <Pressable
-            style={styles.actionButton}
-            onPress={clearCanvas}
-          >
-            <Ionicons name="trash-outline" size={24} color="#FF453A" />
-          </Pressable>
-
-        </View>
         
         {isMenuOpen && (
           <View style={styles.sidebarDrawer}>
@@ -283,6 +306,14 @@ export default function App() {
             onPress={() => !isEraserActive && toggleEraserActive()}
           >
             <EraserIcon color={isEraserActive ? '#FFFFFF' : '#A0A0A0'} size={24} />
+          </Pressable>
+
+          {/* Image */}
+          <Pressable
+            style={styles.toolButton}
+            onPress={handleAddImage}
+          >
+            <Ionicons name="image-outline" size={24} color="#FFFFFF" />
           </Pressable>
 
           {/* Divider */}

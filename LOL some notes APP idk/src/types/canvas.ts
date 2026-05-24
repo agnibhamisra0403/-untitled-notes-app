@@ -1,3 +1,16 @@
+import { SkImage } from '@shopify/react-native-skia';
+
+export interface ImageAsset {
+    id: string;
+    x: number;
+    y: number;
+    width: number;
+    height: number;
+    rotation: number;
+    scale: number;
+    image: SkImage;
+}
+
 export interface Point {
     x: number;
     y: number;
