@@ -1,12 +1,12 @@
-import { Canvas, Path, Skia, Group, Circle, Image, Rect } from '@shopify/react-native-skia';
-import { Animated, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
+import { Canvas, Circle, Group, Image, Line, Path, Rect, Skia } from '@shopify/react-native-skia';
 import { useRef, useState } from 'react';
-import { Gesture, GestureDetector, GestureHandlerRootView, GestureUpdateEvent, PanGestureHandlerEventPayload, PanGestureChangeEventPayload } from 'react-native-gesture-handler';
+import { Animated, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Gesture, GestureDetector, GestureHandlerRootView, GestureUpdateEvent, PanGestureHandlerEventPayload } from 'react-native-gesture-handler';
+import { EraserIcon } from '../components/eraserIcon';
+import { SidebarIcon } from '../components/SidebarIcon';
 import { useCanvasState } from '../hooks/useCanvasState';
 import { Point } from '../types/canvas';
-import { Ionicons } from '@expo/vector-icons';
-import { EraserIcon } from '../components/eraserIcon';
-import {SidebarIcon} from '../components/SidebarIcon';
 
 let eraserMode = false;
 
@@ -14,33 +14,39 @@ export default function App() {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
 
   const {
-      currentLine,
-      completedLines,
-      canvasOffsetX,
-      canvasOffsetY,
-      zoomMultiplier,
-      isEraserActive,
-      eraserPosition,
-      images,
-      selectedImageId,
-      setEraserPosition,
-      toggleEraserActive,
-      updatePan,
-      setCanvasOffsetX,
-      setCanvasOffsetY,
-      setCompletedLines,
-      handleGestureStart,
-      handleGestureMove,
-      handleGestureEnd,
-      handleZoomUpdate,
-      clearCanvas,
-      handleEraserStart,
-      handleEraserMove,
-      handleEraserEnd,
-      handleAddImage,
-      setImages,
-      setSelectedImageId,
-      handleImageTap,
+    currentLine,
+    completedLines,
+    canvasOffsetX,
+    canvasOffsetY,
+    zoomMultiplier,
+    isEraserActive,
+    eraserPosition,
+    images,
+    selectedImageId,
+    setEraserPosition,
+    toggleEraserActive,
+    updatePan,
+    setCanvasOffsetX,
+    setCanvasOffsetY,
+    setCompletedLines,
+    handleGestureStart,
+    handleGestureMove,
+    handleGestureEnd,
+    handleZoomUpdate,
+    clearCanvas,
+    handleEraserStart,
+    handleEraserMove,
+    handleEraserEnd,
+    handleAddImage,
+    setImages,
+    setSelectedImageId,
+    handleImageTap,
+    activeTransformZone,
+    handleFingerPanStart,
+    handleFingerPanMove,
+    handleFingerPanEnd,
+    deleteSelectedImage,
+    duplicateSelectedImage,
   } = useCanvasState();
 
   // handler for panning/drawing gestures
@@ -51,7 +57,7 @@ export default function App() {
       console.log("pointer type", event.pointerType);
       console.log("number of pointers", event.numberOfPointers);
       if (event.pointerType === 0) {
-        // finger pan case, we need to update canvas offset here - in this case there is no end position, so we do the update here instead of onEnd
+        handleFingerPanStart(event);
       }
       else if (event.pointerType === 1) {
         setSelectedImageId(null);
@@ -67,9 +73,7 @@ export default function App() {
       console.log("pointer type", event.pointerType);
       console.log("number of pointers", event.numberOfPointers);
       if (event.pointerType === 0) {
-        // finger pan case
-        console.log("Pan Deltas:", event.changeX, event.changeY);
-        updatePan(event.changeX, event.changeY);
+        handleFingerPanMove(event);
       }
       else if (event.pointerType === 1) {
         if (isEraserActive) {
@@ -82,11 +86,15 @@ export default function App() {
       }
     })
     .onEnd((event) => {
-      if (isEraserActive) {
-        handleEraserEnd()
+      if (event.pointerType === 0) {
+        handleFingerPanEnd(event);
       }
-      else {
-        handleGestureEnd();
+      else if (event.pointerType === 1) {
+        if (isEraserActive) {
+          handleEraserEnd();
+        } else {
+          handleGestureEnd();
+        }
       }
     });
 
@@ -118,11 +126,11 @@ export default function App() {
       previousFocal.current = { x: event.focalX, y: event.focalY };
     });
 
-    const imageTapGesture = Gesture.Tap()
-      .runOnJS(true)
-      .onEnd(event => {
-        handleImageTap(event);
-      })
+  const imageTapGesture = Gesture.Tap()
+    .runOnJS(true)
+    .onEnd(event => {
+      handleImageTap(event);
+    })
 
   const simultanousGestures = Gesture.Simultaneous(pencilPanGesture, canvasPinchGesture, imageTapGesture);
 
@@ -130,7 +138,7 @@ export default function App() {
     `Active Points: ${currentLine?.points.length || 0} | Total Lines Saved: ${completedLines.length}\n`
   );
 
-     
+
 
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
@@ -138,8 +146,11 @@ export default function App() {
         <Canvas style={styles.canvas}>
           <Group transform={[{ translateX: canvasOffsetX }, { translateY: canvasOffsetY }, { scale: zoomMultiplier }]}>
 
-            {images && images.map((img) => (
-              <Group key={img.id}>
+            {images && images.map((img) => {
+              const centerX = img.x + (img.width * img.scale) / 2;
+              const centerY = img.y + (img.height * img.scale) / 2;
+              return (
+                <Group key={img.id} origin={{ x: centerX, y: centerY }} transform={[{ rotate: img.rotation }]}>
 
                 {/* The Actual Image */}
                 <Image
@@ -163,6 +174,11 @@ export default function App() {
                       strokeWidth={2}
                     />
 
+                    {/* Rotation handle */}
+                    <Line p1={{ x: centerX, y: img.y }} p2={{ x: centerX, y: img.y - 30 }} color="#0A84FF" strokeWidth={2} />
+                    <Circle cx={centerX} cy={img.y - 30} r={6} color="#FFFFFF" style="fill" />
+                    <Circle cx={centerX} cy={img.y - 30} r={6} color="#0A84FF" style="stroke" strokeWidth={2} />
+
                     {/* resizing corners */}
                     {/* Top Left */}
                     <Rect x={img.x - 6} y={img.y - 6} width={12} height={12} color="#FFFFFF" style="fill" />
@@ -181,8 +197,9 @@ export default function App() {
                     <Rect x={img.x - 6} y={(img.y + (img.height * img.scale)) - 6} width={12} height={12} color="#0A84FF" style="stroke" strokeWidth={2} />
                   </Group>
                 )}
-              </Group>
-            ))}
+                </Group>
+              );
+            })}
 
             {/* for all the completed lines in the array */}
             {completedLines.map((line, index) => {
@@ -252,17 +269,40 @@ export default function App() {
         </Canvas>
 
         <GestureDetector gesture={simultanousGestures}>
-          <Animated.View style={StyleSheet.absoluteFill}/>
+          <Animated.View style={StyleSheet.absoluteFill} />
         </GestureDetector>
 
-        
+        {/* Image Context Menu */}
+        {selectedImageId && (() => {
+          const selectedImg = images.find(img => img.id === selectedImageId);
+          if (!selectedImg) return null;
+          const screenX = (selectedImg.x * zoomMultiplier) + canvasOffsetX;
+          const screenY = (selectedImg.y * zoomMultiplier) + canvasOffsetY - 60;
+          return (
+            <View style={[styles.contextMenu, { left: screenX, top: screenY }]}>
+
+              <Pressable style={styles.contextButton} onPress={duplicateSelectedImage}>
+                <Ionicons name="copy" size={24} color="#0A84FF" />
+              </Pressable>
+
+              <View style={styles.contextDivider} />
+
+              <Pressable style={styles.contextButton} onPress={deleteSelectedImage}>
+                <Ionicons name="trash" size={24} color="#FF453A" />
+              </Pressable>
+
+            </View>
+          );
+        })()}
+
+
         {isMenuOpen && (
           <View style={styles.sidebarDrawer}>
 
             <View style={styles.sidebarContent}>
               {/* Share Button */}
-              <Pressable 
-                style={styles.sidebarItem} 
+              <Pressable
+                style={styles.sidebarItem}
                 onPress={() => console.log("Share clicked")}
               >
                 <Ionicons name="share-outline" size={24} color="#FFFFFF" />
@@ -272,8 +312,8 @@ export default function App() {
               <View style={styles.menuDivider} />
 
               {/* Export Button */}
-              <Pressable 
-                style={styles.sidebarItem} 
+              <Pressable
+                style={styles.sidebarItem}
                 onPress={() => console.log("Export clicked")}
               >
                 <Ionicons name="download-outline" size={24} color="#FFFFFF" />
@@ -340,11 +380,11 @@ const styles = StyleSheet.create({
 
   toolbarContainer: {
     position: 'absolute',
-    top: 60, 
-    alignSelf: 'center', 
+    top: 60,
+    alignSelf: 'center',
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#2C2C2E', 
+    backgroundColor: '#2C2C2E',
     borderRadius: 16,
     paddingHorizontal: 12,
     paddingVertical: 8,
@@ -363,7 +403,7 @@ const styles = StyleSheet.create({
     backgroundColor: 'transparent',
   },
   activeTool: {
-    backgroundColor: '#0A84FF', 
+    backgroundColor: '#0A84FF',
   },
   divider: {
     width: 1,
@@ -375,7 +415,7 @@ const styles = StyleSheet.create({
     padding: 10,
     marginHorizontal: 4,
     borderRadius: 10,
-    backgroundColor: '#3A1C1E', 
+    backgroundColor: '#3A1C1E',
   },
   menuButton: {
     position: 'absolute',
@@ -384,7 +424,7 @@ const styles = StyleSheet.create({
     padding: 10,
     backgroundColor: '#2C2C2E',
     borderRadius: 12,
-    zIndex: 100, 
+    zIndex: 100,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,
@@ -394,14 +434,14 @@ const styles = StyleSheet.create({
   sidebarDrawer: {
     position: 'absolute',
     top: 0,
-    bottom: 0, 
+    bottom: 0,
     left: 0,
-    width: 260, 
-    backgroundColor: '#1C1C1E', 
+    width: 260,
+    backgroundColor: '#1C1C1E',
     borderRightWidth: 1,
     borderRightColor: '#2C2C2E',
     zIndex: 90,
-    
+
     // Creates a shadow casting to the right over your canvas
     shadowColor: '#000',
     shadowOffset: { width: 4, height: 0 },
@@ -410,7 +450,7 @@ const styles = StyleSheet.create({
     elevation: 10,
   },
   sidebarContent: {
-    marginTop: 130, 
+    marginTop: 130,
     paddingHorizontal: 12,
   },
   sidebarItem: {
@@ -431,5 +471,29 @@ const styles = StyleSheet.create({
     backgroundColor: '#2C2C2E',
     marginHorizontal: 16,
     marginVertical: 8,
-  }
+  },
+  contextMenu: {
+    position: 'absolute',
+    flexDirection: 'row',
+    backgroundColor: '#2C2C2E',
+    borderRadius: 8,
+    padding: 4, 
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 5,
+    elevation: 5,
+  },
+  contextButton: {
+    padding: 8,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderRadius: 6,
+  },
+  contextDivider: {
+    width: 1,
+    backgroundColor: '#48484A',
+    marginVertical: 4,
+    marginHorizontal: 4,
+  },
 });
