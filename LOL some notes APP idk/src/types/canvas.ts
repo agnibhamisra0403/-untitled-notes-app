@@ -8,6 +8,7 @@ export interface ImageAsset {
     height: number;
     rotation: number;
     scale: number;
+    uri: string,
     image: SkImage;
 }
 

@@ -1,4 +1,5 @@
 import { Skia } from '@shopify/react-native-skia';
+import * as FileSystem from 'expo-file-system/legacy';
 import * as ImagePicker from 'expo-image-picker';
 import { useState } from 'react';
 import { Dimensions } from 'react-native';
@@ -181,7 +182,9 @@ export const useCanvasState = () => {
 
             // TODO: Convert this URI for Skia and save it to state
             try {
-                const rawData = await Skia.Data.fromURI(imageAsset.uri);
+
+                const permanentUri = await helperSaveImageToSandbox(imageAsset.uri);
+                const rawData = await Skia.Data.fromURI(permanentUri);
                 const skiaImage = Skia.Image.MakeImageFromEncoded(rawData);
 
                 if (skiaImage) {
@@ -200,6 +203,7 @@ export const useCanvasState = () => {
                         height: imageAsset.height / 4,
                         rotation: 0,
                         scale: 1,
+                        uri: permanentUri,
                         image: skiaImage,
                     }
 
@@ -379,6 +383,23 @@ export const useCanvasState = () => {
                 setImages((prev) => [...prev, duplicatedImage]);
                 setSelectedImageId(duplicatedImage.id);
             }
+        }
+    }
+
+    const helperSaveImageToSandbox = async (tempUri: string) => {
+        try {
+            const uniqueFileName = `canvas-img-${Date.now()}.jpg`;
+            const permanentUri = `${FileSystem.documentDirectory}${uniqueFileName}`;
+            await FileSystem.copyAsync({
+                from: tempUri,
+                to: permanentUri,
+            });
+
+            return permanentUri;
+        }
+        catch (error) {
+            console.error("Failed to save image to sandbox:", error);
+            return tempUri;
         }
     }
 
